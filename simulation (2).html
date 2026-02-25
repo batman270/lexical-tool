@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lexical Analyzer – Praveen RS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    margin:0;
+    background:#0a0a0d;
+    color:#e6e6e6;
+    font-family:Consolas, monospace;
+    letter-spacing:0.5px;
+}
+
+.wrapper{
+    max-width:1150px;
+    margin:60px auto;
+    padding:0 30px;
+}
+
+.header{
+    border-left:6px solid #a00000;
+    padding-left:20px;
+    margin-bottom:40px;
+}
+
+.header h1{
+    margin:0;
+    font-size:34px;
+    letter-spacing:6px;
+    color:#ff1a1a;
+}
+
+.header p{
+    margin:8px 0 0;
+    color:#888;
+    font-size:12px;
+}
+
+textarea{
+    width:100%;
+    min-height:280px;
+    background:#121216;
+    border:1px solid #300000;
+    color:#ffffff;
+    padding:18px;
+    font-size:13px;
+    resize:vertical;
+}
+
+textarea:focus{
+    outline:none;
+    border-color:#ff1a1a;
+    box-shadow:0 0 10px rgba(255,0,0,0.2);
+}
+
+.controls{
+    margin-top:25px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.buttons{
+    display:flex;
+    gap:15px;
+}
+
+button{
+    padding:12px 26px;
+    border:none;
+    font-size:12px;
+    letter-spacing:3px;
+    cursor:pointer;
+    transition:0.2s ease;
+}
+
+.scan{
+    background:#a00000;
+    color:white;
+}
+
+.scan:hover{
+    background:#ff1a1a;
+}
+
+.reset{
+    background:#1a1a1f;
+    color:#bbb;
+    border:1px solid #300000;
+}
+
+.reset:hover{
+    background:#300000;
+    color:white;
+}
+
+.status{
+    font-size:12px;
+    color:#ff1a1a;
+}
+
+.summary{
+    margin-top:35px;
+    font-size:12px;
+}
+
+.summary span{
+    display:inline-block;
+    padding:8px 14px;
+    margin-right:12px;
+    margin-bottom:10px;
+    border-left:3px solid #ff1a1a;
+    background:#141418;
+}
+
+.table-box{
+    margin-top:25px;
+    border:1px solid #300000;
+    background:#121216;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+}
+
+th{
+    text-align:left;
+    padding:14px;
+    background:#160000;
+    color:#ff1a1a;
+    letter-spacing:2px;
+}
+
+td{
+    padding:14px;
+    border-bottom:1px solid #1f0000;
+}
+
+tr:hover{
+    background:#1a0000;
+}
+
+footer{
+    margin-top:60px;
+    text-align:center;
+    font-size:11px;
+    color:#666;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrapper">
+
+<div class="header">
+    <h1>LEXICAL ANALYZER</h1>
+    <p>Compiler Design Project — Praveen RS | RA2311003050361</p>
+</div>
+
+<textarea id="code">
+#include <stdio.h>
+
+int main() {
+  int x = 10;
+  float pi = 3.14;
+  char *msg = "Hello!";
+  if (x >= 5 && pi != 0) {
+    printf("%s\n", msg);
+  }
+  return 0;
+}
+</textarea>
+
+<div class="controls">
+    <div class="buttons">
+        <button class="scan" onclick="runLexer()">SCAN</button>
+        <button class="reset" onclick="resetAll()">RESET</button>
+    </div>
+    <div class="status" id="status">SYSTEM READY</div>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="table-box">
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>TYPE</th>
+<th>VALUE</th>
+<th>LINE</th>
+<th>COL</th>
+</tr>
+</thead>
+<tbody id="output">
+<tr>
+<td colspan="5" style="text-align:center;color:#666;">
+Awaiting execution...
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+Gotham Engine v1.0
+</footer>
+
+</div>
+
+<script>
+var KEYWORDS=["int","float","char","if","else","while","for","return","void","double"];
+var MULTI_OPS=["==","!=","<=",">=","&&","||","++","--","+=","-=","*=","/=","->"];
+var SINGLE_OPS="+-*/=%<>&|!";
+var DELIMITERS="(){}[];,";
+
+function runLexer(){
+    var input=document.getElementById("code").value;
+    var tokens=[];
+    var line=1,col=1,i=0;
+
+    function add(type,val,l,c){
+        tokens.push({type:type,value:val,line:l,column:c});
+    }
+
+    while(i<input.length){
+        var ch=input[i];
+
+        if(ch===" "||ch==="\t"){col++;i++;continue;}
+        if(ch==="\n"){line++;col=1;i++;continue;}
+
+        var startLine=line,startCol=col;
+
+        if(ch==="#"){
+            var val="";
+            while(i<input.length && input[i]!=="\n"){
+                val+=input[i];i++;col++;
+            }
+            add("PREPROCESSOR",val,startLine,startCol);
+            continue;
+        }
+
+        if(/[0-9]/.test(ch)){
+            var num="";
+            while(i<input.length && /[0-9.]/.test(input[i])){
+                num+=input[i];i++;col++;
+            }
+            add("NUMBER",num,startLine,startCol);
+            continue;
+        }
+
+        if(/[a-zA-Z_]/.test(ch)){
+            var word="";
+            while(i<input.length && /[a-zA-Z0-9_]/.test(input[i])){
+                word+=input[i];i++;col++;
+            }
+            if(KEYWORDS.indexOf(word)!==-1)
+                add("KEYWORD",word,startLine,startCol);
+            else
+                add("IDENTIFIER",word,startLine,startCol);
+            continue;
+        }
+
+        if(ch==="\""||ch==="'"){
+            var quote=ch,str=quote;i++;col++;
+            while(i<input.length && input[i]!==quote){
+                str+=input[i];i++;col++;
+            }
+            if(i<input.length){str+=quote;i++;col++;}
+            add("STRING",str,startLine,startCol);
+            continue;
+        }
+
+        var two=input.substring(i,i+2);
+        if(MULTI_OPS.indexOf(two)!==-1){
+            add("OPERATOR",two,startLine,startCol);
+            i+=2;col+=2;continue;
+        }
+
+        if(SINGLE_OPS.indexOf(ch)!==-1){
+            add("OPERATOR",ch,startLine,startCol);
+            i++;col++;continue;
+        }
+
+        if(DELIMITERS.indexOf(ch)!==-1){
+            add("DELIMITER",ch,startLine,startCol);
+            i++;col++;continue;
+        }
+
+        add("UNKNOWN",ch,startLine,startCol);
+        i++;col++;
+    }
+
+    render(tokens);
+    document.getElementById("status").innerText="TOKENS: "+tokens.length;
+}
+
+function render(tokens){
+    var output=document.getElementById("output");
+    var summary=document.getElementById("summary");
+    output.innerHTML="";
+    summary.innerHTML="";
+
+    var count={};
+
+    for(var i=0;i<tokens.length;i++){
+        var t=tokens[i];
+        if(!count[t.type])count[t.type]=0;
+        count[t.type]++;
+        output.innerHTML+="<tr><td>"+(i+1)+"</td><td>"+t.type+"</td><td>"+t.value+"</td><td>"+t.line+"</td><td>"+t.column+"</td></tr>";
+    }
+
+    for(var key in count){
+        summary.innerHTML+="<span>"+key+": "+count[key]+"</span>";
+    }
+}
+
+function resetAll(){
+    document.getElementById("code").value="";
+    document.getElementById("output").innerHTML="<tr><td colspan='5' style='text-align:center;color:#666;'>Awaiting execution...</td></tr>";
+    document.getElementById("summary").innerHTML="";
+    document.getElementById("status").innerText="SYSTEM READY";
+}
+</script>
+
+</body>
+</html>
